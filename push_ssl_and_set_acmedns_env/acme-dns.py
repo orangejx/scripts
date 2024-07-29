@@ -4,7 +4,7 @@ import shutil
 import sys
 from datetime import datetime
 
-# 配置文件路径
+# config path 
 CONFIG_FILE = '/acme.sh/account.conf'
 JSON_FILE = './acme-dns_list.json'
 profile_path = '~/.profile'
@@ -31,12 +31,12 @@ def write_config(config, updated_keys):
         for key in updated_keys:
             if key in config:
                 value = config[key]
-                # 加上单引号
+                # add Single quotation marks 
                 if not (value.startswith("'") and value.endswith("'")):
                     value = f"'{value}'"
                 f.write(f"{key}={value}\n")
 
-    # 替换原文件
+    # replace orginal file 
     shutil.move(temp_file, CONFIG_FILE)
 
 def backup_config():
@@ -66,43 +66,43 @@ def update_profile(config):
 
     with open(profile_file, 'w') as f:
         for key, value in profile_config.items():
-            # 加上单引号
+            # add Single quotation marks 
             if not (value.startswith("'") and value.endswith("'")):
                 value = f"'{value}'"
             if value != existing_profile_config.get(key, ''):
                 f.write(f"export {key}={value}\n")
 
 def main():
-    # 检查参数
+    # check args 
     if len(sys.argv) != 2:
         print("Usage: python script.py <domain>")
         sys.exit(1)
 
     domain = sys.argv[1]
 
-    # 读取 JSON 文件
+    # load JSON 
     with open(JSON_FILE) as f:
         dns_config = json.load(f)
 
-    # 读取现有配置
+    # load config 
     current_config = read_config()
 
-    # 新配置字典
+    # new dict 
     updated_keys = ['SAVED_ACMEDNS_USERNAME', 'SAVED_ACMEDNS_PASSWORD', 'SAVED_ACMEDNS_BASE_URL', 'SAVED_ACMEDNS_SUBDOMAIN']
     new_config = {key: dns_config.get(domain, {}).get(key.split('_')[-1].lower(), '') for key in updated_keys}
 
-    ## 如果配置有变化
+    ## if config file changed 
     #if any(current_config.get(key) != new_config[key] for key in updated_keys):
-    #    # 备份配置文件
+    #    # backup config file 
     #    backup_config()
-    #    # 写入配置文件
+    #    # save to config file 
     #    write_config(new_config, updated_keys)
 
-    # 更新 ~/.profile
+    # save ~/.profile
     update_profile(new_config)
 
-    print("acme-dns 配置信息加载完成. ")
-    # # 延时 10 秒
+    print("acme-dns config info loaded. ")
+    # # delay 10s
     # import time
     # time.sleep(5)
 

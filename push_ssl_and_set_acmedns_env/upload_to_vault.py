@@ -7,47 +7,47 @@ from dateutil import parser
 from dotenv import load_dotenv
 
 
-# 指定 .env 文件的路径
+# .env PATH 
 dotenv_path = './.env'
 if os.path.exists(dotenv_path):
     load_dotenv(dotenv_path)
-    print(f".env 文件已加载")
+    print(f".env loaded")
 else:
-    print(f"读取.env文件时出错")
+    print(f"Err for .env loading")
     sys.exit(1)
 
-# 读取环境变量
-# Vault 服务器的 URL 和 Token
+# get Server env
+# Vault' URL and Token
 VAULT_URL = os.getenv('VAULT_URL')
 VAULT_TOKEN = os.getenv('VAULT_TOKEN')
 VAULT_PATHS_FILE = os.getenv('VAULT_PATHS_FILE', './vault_paths.json')
-TOKEN_RENEWAL_THRESHOLD = int(os.getenv('TOKEN_RENEWAL_THRESHOLD', '604800'))  # Token 剩余时间低于 7 天时续期（单位：秒）
-# 解封密钥文件路径
+TOKEN_RENEWAL_THRESHOLD = int(os.getenv('TOKEN_RENEWAL_THRESHOLD', '604800'))  #  Renewal Time, remaining less than 7 days (unit: second) 
+# path of the unseal key file
 UNSEAL_KEYS_FILE = os.getenv('UNSEAL_KEYS_FILE', './vault_unseal_keys.json')
 UNSEAL_LOGS_FILE = os.getenv('UNSEAL_LOGS_FILE', './vault_unseal.log')
-# 默认 Vault 路径
+# default path of ssl push to Vault 
 DEFAULT_VAULT_PATH = os.getenv('DEFAULT_VAULT_PATH', 'ssl/data/default')
 
 def install_dependencies():
-    """自动安装依赖"""
+    """auto install dependencies"""
     try:
         subprocess.check_call([sys.executable, "-m", "pip", "install", "hvac"])
-        print("依赖库 hvac 已成功安装")
+        print("hvac installed")
     except subprocess.CalledProcessError as e:
-        print(f"安装依赖库时出错: {e}")
+        print(f"Err for install hvac: {e}")
         sys.exit(1)
 
-# 安装依赖库
+# install dependencies
 # install_dependencies()
 
-# 创建 Vault 客户端
+# create Vault client
 client = hvac.Client(
     url=VAULT_URL,
     token=VAULT_TOKEN
 )
 
 def read_cert_key_ca(cert_path, key_path, ca_path):
-    """从本地文件读取证书、密钥和 CA"""
+    """Load cert, key and chain form local file"""
     try:
         with open(cert_path, 'r') as cert_file:
             cert = cert_file.read()
@@ -59,94 +59,94 @@ def read_cert_key_ca(cert_path, key_path, ca_path):
                 ca = ca_file.read()
         return cert, key, ca
     except Exception as e:
-        print(f"读取证书、密钥或 CA 文件时出错: {e}")
+        print(f"Err for load cert, key and chain: {e}")
         sys.exit(1)
 
 def get_vault_path(domain):
-    """从路径映射表中获取 Vault 路径，如果域名不在列表中，返回默认路径"""
+    """Obtain the Vault path from the path mapping table. Return the default If the domain name is not in the list"""
     try:
         with open(VAULT_PATHS_FILE, 'r') as file:
             paths = json.load(file)
-        # 获取指定域名的 Vault 路径，如果没有找到，则使用默认路径
+        # Gets the Vault path of the specified domain name. Use default path If it is not found 
         return paths.get(domain, DEFAULT_VAULT_PATH)
     except Exception as e:
-        print(f"读取路径映射表时出错: {e}")
-        # 在读取路径映射表出错时也使用默认路径
+        print(f"An error occurred load the path mapping table: {e}")
+        # Use default path when error loading the path mapping table
         return DEFAULT_VAULT_PATH
 
 def write_to_vault(vault_path, cert, key, ca, is_ecc):
-    """将证书、密钥和 CA 写入 Vault"""
+    """save cert, key and Chian Vault"""
     if not vault_path:
-        print("Vault 路径未定义")
+        print("Vault path not defined")
         return
 
     try:
-        # 处理路径格式
+        # Process path format 
         mount_point, path = vault_path.split('/', 1)
-        path = path.lstrip('/')  # 去掉路径开头的斜杠
+        path = path.lstrip('/')  # Remove the slash at the beginning of the path 
 
-        # 上传证书、密钥、CA 和是否为 ECC 到 Vault
+        # upload cert, key, Chian and is_ecc Vault 
         client.secrets.kv.v2.create_or_update_secret(
             mount_point=mount_point,
             path=path,
             secret=dict(cert=cert, key=key, ca=ca, is_ecc=is_ecc)
         )
-        print(f"成功将证书、密钥、CA 和是否为 ECC 写入 Vault 路径: {vault_path}")
+        print(f"uploaded: {vault_path}")
     except Exception as e:
-        print(f"将证书、密钥、CA 和是否为 ECC 写入 Vault 时出错: {e}")
+        print(f"Err when upload cert, key, Chian and is_ecc Vault: {e}")
 
 def renew_token_if_needed():
-    """检查 token 是否接近过期并续期"""
+    """Check whether the token is nearing expiration and renew"""
     try:
-        # 获取当前 token 的信息
+        # lookup token 
         token_info = client.lookup_token()
         expire_time = token_info['data']['expire_time']
         current_time = time.time()
         
-        # 解析 expire_time
+        # check expire_time
         expire_time_dt = parser.parse(expire_time)
         expire_time_seconds = time.mktime(expire_time_dt.timetuple())
         ttl = expire_time_seconds - current_time
 
-        # 如果剩余时间小于阈值，则续期 token
+        # Renew the token If the remaining time is less than the threshold 
         if ttl < TOKEN_RENEWAL_THRESHOLD:
             if token_info['data'].get('renewable'):
                 client.renew_token()
-                print("Token 已续期")
+                print("Token Renewed")
             else:
-                print("Token 不可续期")
+                print("Token cannot renew")
         else:
-            print("Token 有效期足够，无需续期")
+            print("Token is valid enough, not need renew")
     except Exception as e:
-        print(f"检查或续期 token 时出错: {e}")
+        print(f"Error checking or renewing token: {e}")
 
 def log_message(message):
-    """记录日志到控制台和文件"""
+    """save log to console and log file"""
     with open(UNSEAL_LOGS_FILE, 'a') as log_file:
         log_file.write(f"{message}\n")
     print(message)
 
 def unseal_vault():
-    """解封 Vault"""
+    """Unseal Vault"""
     try:
         with open(UNSEAL_KEYS_FILE, 'r') as file:
             unseal_keys = json.load(file)
         
-        # 解封密钥并解封 Vault 
+        # load keys and unseal Vault 
         client.sys.submit_unseal_keys(unseal_keys)
-        print("使用解密密钥成功")
+        print("success to use keys")
         
-        # 检查 Vault 是否已解封
+        # check Vault seal status 
         if client.sys.is_sealed():
-            print("Vault 仍然是封闭的")
+            print("Vault is still sealed")
         else:
-            print("Vault 已成功解封")
+            print("Vault unsealed")
     except Exception as e:
-        print(f"解封 Vault 时出错: {e}")
+        print(f"Err for unseal Vault: {e}")
 
 if __name__ == "__main__":
     if len(sys.argv) < 5:
-        print("使用方法: upload_to_vault.py <cert_file> <key_file> <domain> <is_ecc> [<ca_file>]")
+        print("method: upload_to_vault.py <cert_file> <key_file> <domain> <is_ecc> [<ca_file>]")
         sys.exit(1)
 
     cert_file_path = sys.argv[1]
@@ -155,11 +155,11 @@ if __name__ == "__main__":
     is_ecc = sys.argv[4].lower() in ["true", "yes", "1", "--ecc", "-ecc"]
     ca_file_path = sys.argv[5] if len(sys.argv) == 6 else None
 
-    # 检查 Vault 是否被封印
+    # check Vault seal status
     if client.sys.is_sealed():
-        log_message("Vault 被封印, 开始解封")
-        unseal_vault()  # 解封 Vault
-    renew_token_if_needed()  # 检查并续期 token
+        log_message("Vault is sealed, try to unseal")
+        unseal_vault()  # unseal Vault
+    renew_token_if_needed()  # check and renew token 
     cert, key, ca = read_cert_key_ca(cert_file_path, key_file_path, ca_file_path)
     write_to_vault(get_vault_path(domain), cert, key, ca, is_ecc)
 

@@ -7,40 +7,40 @@ import logging
 from dotenv import load_dotenv
 
 
-# 指定 .env 文件的路径
+# .env PATH 
 dotenv_path = './.env'
 if os.path.exists(dotenv_path):
     load_dotenv(dotenv_path)
-    print(f".env 文件已加载")
+    print(f".env loaded")
 else:
-    print(f"读取.env文件时出错")
+    print(f"Error loading the .env")
     sys.exit(1)
 
-# 读取环境变量
-# Vault 服务器的 URL 和 Token
+# load env configuration 
+# Vault URL and Token
 VAULT_URL = os.getenv('VAULT_URL')
 VAULT_TOKEN = os.getenv('VAULT_TOKEN')
-VAULT_PATHS_FILE = os.getenv('VAULT_PATHS_FILE')
-OUTPUT_DIR = os.getenv('OUTPUT_DIR')
-CHECK_INTERVAL = int(os.getenv('CHECK_INTERVAL', '604800'))  # 默认为一周 
-LOG_FILE = os.getenv('LOG_FILE')
-CERT_NAME = os.getenv('CERT_NAME')
-KEY_NAME = os.getenv('KEY_NAME')
-CA_NAME = os.getenv('CA_NAME')
+VAULT_PATHS_FILE = os.getenv('VAULT_PATHS_FILE', './vault_paths.json')
+OUTPUT_DIR = os.getenv('OUTPUT_DIR', './ssl')
+CHECK_INTERVAL = int(os.getenv('CHECK_INTERVAL', '604800'))  # default: 1 week 
+LOG_FILE = os.getenv('LOG_FILE', './update.log')
+CERT_NAME = os.getenv('CERT_NAME', 'fullchain.pem')
+KEY_NAME = os.getenv('KEY_NAME', 'privkey.pem')
+CA_NAME = os.getenv('CA_NAME', 'ca.pem')
 
-# 配置日志记录
+# config log 
 logging.basicConfig(filename=LOG_FILE,
                     level=logging.INFO,
                     format='%(asctime)s - %(levelname)s - %(message)s')
 
 def log_and_print(message, level='info'):
     """
-    同时记录日志并输出到控制台
+    save log and print it to console
     """
-    # 输出到控制台
+    # print it to console 
     print(message)
     
-    # 根据日志级别记录日志
+    # log made based on the log level
     if level == 'info':
         logging.info(message)
     elif level == 'warning':
@@ -53,28 +53,28 @@ def log_and_print(message, level='info'):
         logging.error(f"Unknown log level: {level}. Message: {message}")
 
 def read_cert_list(file_path):
-    """从 JSON 文件中读取证书列表及其版本信息"""
+    """Loading Cert List and version"""
     try:
         with open(file_path, 'r') as file:
             return json.load(file)
     except Exception as e:
-        log_and_print(f"读取证书列表文件时出错: {e}", 'error')
+        log_and_print(f"Error loading cert list: {e}", 'error')
         return {}
 
 def write_cert_list(file_path, data):
-    """将更新后的证书配置信息和版本信息写入 JSON 文件"""
+    """save updated cert config info and version to JSON file"""
     try:
         with open(file_path, 'w') as file:
             json.dump(data, file, indent=4)
     except Exception as e:
-        log_and_print(f"写入证书列表文件时出错: {e}", 'error')
+        log_and_print(f"Error save cert list: {e}", 'error')
 
 def setup_vault_client():
-    """设置 Vault 客户端"""
+    """set Vault client"""
     return hvac.Client(url=VAULT_URL, token=VAULT_TOKEN)
 
 def get_local_version(cert_info):
-    """从本地证书信息中获取版本"""
+    """Load version from local cert info"""
     version_str = cert_info.get('version', '')
     try:
         return int(version_str)
@@ -82,7 +82,7 @@ def get_local_version(cert_info):
         return None
 
 def fetch_and_save_certificates(vault_client, domain, mount_point, path, cert_info):
-    """从 Vault 获取证书、密钥和 CA, 并保存到本地文件"""
+    """save Cert, Key and Chian from Vault"""
     try:
         local_version = get_local_version(cert_info)
         vault_params = {
@@ -92,28 +92,28 @@ def fetch_and_save_certificates(vault_client, domain, mount_point, path, cert_in
         fetch_latest = True
         
         if local_version is not None:
-            # 获取 Vault 数据的当前版本
+            # get current version from Vault
             secret_metadata = vault_client.secrets.kv.v2.read_secret_metadata(**vault_params)
             current_version = secret_metadata['data']['current_version']
             if current_version == local_version:
                 fetch_latest = False
             else:
-                # 设置需要获取的版本 
+                # set version need to update
                 vault_params['version'] = current_version
                 
         
-        vault_params["raise_on_deleted_version"] = True  # 避免访问已删除版本时报错
+        vault_params["raise_on_deleted_version"] = True  # Avoid errors in accessing deleted versions 
         if fetch_latest:
-            # 获取 Vault 数据的指定版本
+            # get current version data from Vault 
             secret = vault_client.secrets.kv.v2.read_secret_version(**vault_params)
             data = secret['data']['data']
             current_version = secret['data']['metadata']['version']
             
-            # 创建域名目录
+            # create domain dir
             domain_dir = os.path.join(OUTPUT_DIR, domain)
             os.makedirs(domain_dir, exist_ok=True)
             
-            # 保存证书、密钥和 CA 到文件
+            # save Cert, Key and Chain to file 
             cert_path = os.path.join(domain_dir, CERT_NAME)
             key_path = os.path.join(domain_dir, KEY_NAME)
             ca_path = os.path.join(domain_dir, CA_NAME)
@@ -124,44 +124,44 @@ def fetch_and_save_certificates(vault_client, domain, mount_point, path, cert_in
             with open(ca_path, 'w') as ca_file:
                 ca_file.write(data.get('ca', ''))
             
-            log_and_print(f"成功保存 {domain} 的证书, 秘钥和证书链到 {domain_dir}", 'info')
+            log_and_print(f"success get cert, key and chain for {domain}, and save to {domain_dir}", 'info')
             
-            # 更新版本记录
+            # update version for local 
             cert_info['version'] = current_version
         else:
-            log_and_print(f"{domain} 的证书版本未更新, 跳过下载", 'info')
+            log_and_print(f"{domain}'s cert is up to date, Skipped", 'info')
     
     except hvac.exceptions.Forbidden as e:
-        log_and_print(f"权限错误: 无法访问 Vault 路径 {mount_point}/{path}. 错误信息: {e}", 'error')
+        log_and_print(f"Permission Denied: cannot get Vault path {mount_point}/{path}. Err: {e}", 'error')
     except hvac.exceptions.InvalidRequest as e:
-        log_and_print(f"请求错误: 无效的请求 {mount_point}/{path}. 错误信息: {e}", 'error')
+        log_and_print(f"Wrong request: invalid request {mount_point}/{path}. Err: {e}", 'error')
     except Exception as e:
-        log_and_print(f"从 Vault 获取和保存证书数据时出错: {e}", 'error')
+        log_and_print(f"Wrong obtaining and saving cert data from Vault: {e}", 'error')
     
     return cert_info
 
 def main():
-    """主函数"""
-    # 设置 Vault 客户端
+    """main function"""
+    # set Vault client
     vault_client = setup_vault_client()
     
     while True:
-        # 读取证书列表及其版本
+        # get cert list and version 
         cert_list = read_cert_list(VAULT_PATHS_FILE)
         updated_cert_list = {}
         
         for domain, info in cert_list.items():
-            mount_point = info.get('mount', 'ssl')  # 默认挂载点为 'ssl'
+            mount_point = info.get('mount', 'ssl')  # default mount point is 'ssl'
             path = info.get('path', '')
             updated_cert_info = fetch_and_save_certificates(vault_client, domain, mount_point, path, info)
             
             if updated_cert_info:
                 updated_cert_list[domain] = updated_cert_info
         
-        # 写入更新后的版本信息
+        # save new version info updated
         write_cert_list(VAULT_PATHS_FILE, updated_cert_list)
         
-        # 等待指定的时间间隔
+        # scheduled restart task
         time.sleep(CHECK_INTERVAL)
 
 if __name__ == "__main__":
