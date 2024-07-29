@@ -1,10 +1,15 @@
 # Push SSL to Vault 
 
 > PS: 
+
 > when I discovered the ACME DNS project, I found it really great. It minimizes risk by limiting it to the _acme-challenge subdomain. 
+
 >But, then I found out that it has an account for each subdomain, which is also a way to reduce risk. But this is disastrous when you use acme.sh because all of acme.sh's account information is stored in ~/.acme.sh/account.conf.
+
 >I tried using pre-hook to set environment variables before using acme-dns, but I was disappointed to find that pre-hook as a child process, set environment variables that only affect itself and its child.
+
 >By chance, I found some sub-account profiles containing ACME-DNS configuration information. I was curious about this, so I checked dnsapi/dns_acmedns.sh carefully, and I was pleasantly surprised to find that it reads the information from the configuration file of the sub-account.
+
 >Therefore, you only need to set the environment variable on the 1st run when you use ACME DNS, as it is automatically saved to the sub-account config file. If you are not running ACME DNS for the 1st time, you can manually add ACME DNS configuration information to the sub-account.
 
 > You have to ensure the correct path of hook shell and domain in `VAULT_PATHS_FILE`.
