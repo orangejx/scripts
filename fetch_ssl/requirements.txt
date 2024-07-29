@@ -1,0 +1,2 @@
+python-dotenv==1.0.1
+hvac==2.3.0

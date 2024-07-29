@@ -1,0 +1,10 @@
+{
+    "wlms.dev": {
+        "mount": "ssl",
+        "path": "aldrichx/wlms-dev"
+    },
+    "ora.pub": {
+        "mount": "ssl",
+        "path": "aldrichx/ora-pub"
+    }
+}
