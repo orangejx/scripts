@@ -1,0 +1,20 @@
+{
+    "wlms.dev": {
+        "username": "8d7a9b64-9f30-4d32-992a-c0a15f14d5fe",
+        "password": "kKiuxf2b24pomMuZ5QdvP84TywT85EbzwTccLReM",
+        "fulldomain": "91e2b4c1-4950-4b0b-a8c7-a875faf454b6.auth.acme-dns.io",
+        "subdomain": "91e2b4c1-4950-4b0b-a8c7-a875faf454b6",
+        "domain": "wlms.dev",
+        "url": "https://auth.acme-dns.io",
+        "allowfrom": []
+    },
+    "ora.pub": {
+        "username": "a4dddbf2-3aa3-4f4a-80f6-ba398fe9a126",
+        "password": "EtmaozmaQufh2S7hDcgf3L5uqiz2nqez2bNskr6S",
+        "fulldomain": "338002d3-69f2-4694-8384-88474ada4c58.auth.acme-dns.io",
+        "subdomain": "338002d3-69f2-4694-8384-88474ada4c58",
+        "domain": "ora.pub",
+        "url": "https://auth.acme-dns.io",
+        "allowfrom": []
+    }
+}

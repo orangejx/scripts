@@ -20,11 +20,11 @@ else:
 # Vault 服务器的 URL 和 Token
 VAULT_URL = os.getenv('VAULT_URL')
 VAULT_TOKEN = os.getenv('VAULT_TOKEN')
-VAULT_PATHS_FILE = os.getenv('VAULT_PATHS_FILE', '/scripts/vault_paths.json')
+VAULT_PATHS_FILE = os.getenv('VAULT_PATHS_FILE', './vault_paths.json')
 TOKEN_RENEWAL_THRESHOLD = int(os.getenv('TOKEN_RENEWAL_THRESHOLD', '604800'))  # Token 剩余时间低于 7 天时续期（单位：秒）
 # 解封密钥文件路径
-UNSEAL_KEYS_FILE = os.getenv('UNSEAL_KEYS_FILE', '/scripts/vault_unseal_keys.json')
-UNSEAL_LOGS_FILE = os.getenv('UNSEAL_LOGS_FILE', '/scripts/vault_unseal.log')
+UNSEAL_KEYS_FILE = os.getenv('UNSEAL_KEYS_FILE', './vault_unseal_keys.json')
+UNSEAL_LOGS_FILE = os.getenv('UNSEAL_LOGS_FILE', './vault_unseal.log')
 # 默认 Vault 路径
 DEFAULT_VAULT_PATH = os.getenv('DEFAULT_VAULT_PATH', 'ssl/data/default')
 
