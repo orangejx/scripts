@@ -21,8 +21,11 @@ else:
 VAULT_URL = os.getenv('VAULT_URL')
 VAULT_TOKEN = os.getenv('VAULT_TOKEN')
 VAULT_PATHS_FILE = os.getenv('VAULT_PATHS_FILE', './vault_paths.json')
+UNSEAL_KEYS_FILE = os.getenv('UNSEAL_KEYS_FILE', './vault_unseal_keys.json')
+UNSEAL_LOGS_FILE = os.getenv('UNSEAL_LOGS_FILE', './vault_unseal.log')
 OUTPUT_DIR = os.getenv('OUTPUT_DIR', './ssl')
 CHECK_INTERVAL = int(os.getenv('CHECK_INTERVAL', '604800'))  # default: 1 week 
+TOKEN_RENEWAL_THRESHOLD = int(os.getenv('TOKEN_RENEWAL_THRESHOLD', '604800'))  #  Renewal Time,
 LOG_FILE = os.getenv('LOG_FILE', './update.log')
 CERT_NAME = os.getenv('CERT_NAME', 'fullchain.pem')
 KEY_NAME = os.getenv('KEY_NAME', 'privkey.pem')
@@ -140,29 +143,90 @@ def fetch_and_save_certificates(vault_client, domain, mount_point, path, cert_in
     
     return cert_info
 
+
+def renew_token_if_needed(vault_client):
+    """Check whether the token is nearing expiration and renew"""
+    try:
+        # lookup token 
+        token_info = vault_client.lookup_token()
+        expire_time = token_info['data']['expire_time']
+        current_time = time.time()
+        
+        # check expire_time
+        expire_time_dt = parser.parse(expire_time)
+        expire_time_seconds = time.mktime(expire_time_dt.timetuple())
+        ttl = expire_time_seconds - current_time
+
+        # Renew the token If the remaining time is less than the threshold 
+        if ttl < TOKEN_RENEWAL_THRESHOLD:
+            if token_info['data'].get('renewable'):
+                vault_client.renew_token()
+                print("Token Renewed")
+            else:
+                print("Token cannot renew")
+        else:
+            print("Token is valid enough, not need renew")
+    except Exception as e:
+        print(f"Error checking or renewing token: {e}")
+
+
+def log_message(message):
+    """save log to console and log file"""
+    with open(UNSEAL_LOGS_FILE, 'a') as log_file:
+        log_file.write(f"{message}\n")
+    print(message)
+
+
+def unseal_vault(vault_client):
+    """Unseal Vault"""
+    try:
+        with open(UNSEAL_KEYS_FILE, 'r') as file:
+            unseal_keys = json.load(file)
+        
+        # load keys and unseal Vault 
+        vault_client.sys.submit_unseal_keys(unseal_keys)
+        print("success to use keys")
+        
+        # check Vault seal status 
+        if vault_client.sys.is_sealed():
+            print("Vault is still sealed")
+        else:
+            print("Vault unsealed")
+    except Exception as e:
+        print(f"Err for unseal Vault: {e}")
+
+
 def main():
     """main function"""
     # set Vault client
     vault_client = setup_vault_client()
     
-    while True:
-        # get cert list and version 
-        cert_list = read_cert_list(VAULT_PATHS_FILE)
-        updated_cert_list = {}
+    # while True: # line: 206~229 
+    
+    # get cert list and version 
+    cert_list = read_cert_list(VAULT_PATHS_FILE)
+    updated_cert_list = {}
+    
+    # check Vault seal status
+    if vault_client.sys.is_sealed():
+        log_message("Vault is sealed, try to unseal")
+        unseal_vault(vault_client)  # unseal Vault
+    
+    renew_token_if_needed(vault_client)  # check and renew token 
+    
+    for domain, info in cert_list.items():
+        mount_point = info.get('mount', 'ssl')  # default mount point is 'ssl'
+        path = info.get('path', '')
+        updated_cert_info = fetch_and_save_certificates(vault_client, domain, mount_point, path, info)
         
-        for domain, info in cert_list.items():
-            mount_point = info.get('mount', 'ssl')  # default mount point is 'ssl'
-            path = info.get('path', '')
-            updated_cert_info = fetch_and_save_certificates(vault_client, domain, mount_point, path, info)
-            
-            if updated_cert_info:
-                updated_cert_list[domain] = updated_cert_info
-        
-        # save new version info updated
-        write_cert_list(VAULT_PATHS_FILE, updated_cert_list)
-        
-        # scheduled restart task
-        time.sleep(CHECK_INTERVAL)
+        if updated_cert_info:
+            updated_cert_list[domain] = updated_cert_info
+    
+    # save new version info updated
+    write_cert_list(VAULT_PATHS_FILE, updated_cert_list)
+    
+    # # scheduled restart task
+    # time.sleep(CHECK_INTERVAL)
 
 if __name__ == "__main__":
     main()
