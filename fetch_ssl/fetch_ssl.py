@@ -5,6 +5,7 @@ import sys
 import time
 import logging
 from dotenv import load_dotenv
+from dateutil.parser import parse
 
 
 # .env PATH 
@@ -153,7 +154,7 @@ def renew_token_if_needed(vault_client):
         current_time = time.time()
         
         # check expire_time
-        expire_time_dt = parser.parse(expire_time)
+        expire_time_dt = parse(expire_time)
         expire_time_seconds = time.mktime(expire_time_dt.timetuple())
         ttl = expire_time_seconds - current_time
 
