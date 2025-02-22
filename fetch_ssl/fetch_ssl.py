@@ -161,8 +161,22 @@ def renew_token_if_needed(vault_client):
         # Renew the token If the remaining time is less than the threshold 
         if ttl < TOKEN_RENEWAL_THRESHOLD:
             if token_info['data'].get('renewable'):
-                vault_client.renew_token()
-                print("Token Renewed")
+                try:
+                    # Try to renew the token, 31 days
+                    response = vault_client.auth.token.renew_self(increment=60*60*24*31)
+                    if response:
+                        print("Token renewed successfully!")
+                        # Get the renewed token information
+                        new_ttl = response['auth']['lease_duration']
+                        print(f"New TTL (Time To Live): {new_ttl} seconds")
+                    else:
+                        print("Token renewal failed. No valid response was returned.")
+                except hvac.exceptions.Forbidden:
+                    print("Insufficient permissions to renew the token. Please check if the policy associated with the token includes renewal permissions.")
+                except Exception as e:
+                    print(f"An error occurred while renewing the token: {e}")
+                # vault_client.renew_token()
+                # print("Token Renewed")
             else:
                 print("Token cannot renew")
         else:
