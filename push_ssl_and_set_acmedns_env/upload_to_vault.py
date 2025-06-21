@@ -111,7 +111,8 @@ def renew_token_if_needed():
         # Renew the token If the remaining time is less than the threshold 
         if ttl < TOKEN_RENEWAL_THRESHOLD:
             if token_info['data'].get('renewable'):
-                client.renew_token()
+                # client.auth.token.renew_token(token=VAULT_TOKEN,increment=3600*24*32) # renew specific Token 
+                client.auth.token.renew_self(increment=3600*24*32) # renew self 
                 print("Token Renewed")
             else:
                 print("Token cannot renew")
